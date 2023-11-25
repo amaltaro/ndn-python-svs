@@ -8,6 +8,7 @@
 # Basic Libraries
 import logging
 import sys
+import tkinter as tk
 from argparse import ArgumentParser, SUPPRESS
 from typing import List, Callable, Optional
 # NDN Imports
@@ -86,6 +87,7 @@ class Program:
 def main() -> int:
     args = parse_cmd_args()
     args["cache_data"] = True
+    window = tk.Tk()
 
     SVSyncLogger.config(True, None, logging.DEBUG)
     prog = Program(args)
