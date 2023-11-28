@@ -7,8 +7,8 @@
 
 # Basic Libraries
 import logging
+import subprocess
 import sys
-import tkinter as tk
 from argparse import ArgumentParser, SUPPRESS
 from typing import List, Callable, Optional
 # NDN Imports
@@ -87,7 +87,10 @@ class Program:
 def main() -> int:
     args = parse_cmd_args()
     args["cache_data"] = True
-    window = tk.Tk()
+
+    # setup gui
+    print("Creating the GUI...")
+    p = subprocess.Popen(['python3', 'examples/chat_gui.py'])
 
     SVSyncLogger.config(True, None, logging.DEBUG)
     prog = Program(args)
