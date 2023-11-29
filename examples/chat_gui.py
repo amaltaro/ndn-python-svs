@@ -20,8 +20,6 @@ class Chat_App(tk.Tk):
         """Start a very basic tkinter window"""
         super().__init__()
         self.node_name = node_name
-        self.node_input_file = f"{node_name}_input.json"
-        self.node_output_file = f"{node_name}_output.json"
         self.group_prefix = group_prefix
 
         # set up the window title
@@ -31,11 +29,13 @@ class Chat_App(tk.Tk):
         tk.Message(self, text=f"Group prefix: {group_prefix}", width=50).grid(row=0, column=0)
         tk.Message(self, text=f"Node name:    {node_name}", width=50).grid(row=1, column=0)
 
+        # utilitarian variables
+        self.node_input_file = f"{node_name}_input.json"
+        self.node_output_file = f"{node_name}_output.json"
+        self.last_msg = dict()  # contains the latest message received through SVS Sync
+
         # now clear files to be used
         self._clear_files()
-
-        # variable to keep the last message received in the group
-        self.last_msg = dict()
 
     def _clear_files(self):
         """Clear files to be used as a pipeline"""
