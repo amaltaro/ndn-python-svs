@@ -1,3 +1,6 @@
+import json
+import os
+import time
 import tkinter as tk
 import socket
 import threading
@@ -5,16 +8,20 @@ import sys
 
 
 HOST = "127.0.0.1"
-PORT = int(sys.argv[1])  # this is supposed to be the port number
+JSON_FILE = sys.argv[1] + ".json"  # this corresponds to the node_id
+PORT = int(sys.argv[2])  # this is supposed to be the port number
 
 
 def listen_for_messages():
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
-        server_socket.connect((HOST, PORT))
-        while True:
-            message = server_socket.recv(1024).decode('utf-8')
-            if message:
-                root.after(0, lambda: display_message(f"Other: {message}"))
+    input_data = ""
+    while True:
+        if os.path.isfile(JSON_FILE) and os.access(JSON_FILE, os.R_OK):
+            with open(JSON_FILE, "rt") as jo:
+                data = json.load(jo)
+            if input_data != data:
+                root.after(0, lambda: display_message(data))
+                input_data = data
+        time.sleep(0.05)
 
 
 def send_message():
@@ -34,7 +41,7 @@ def display_message(message):
 
 # Creating the main window
 root = tk.Tk()
-root.title("Chat App")
+root.title("NDN SVS Chat application.")
 
 # Creating the chat history text box
 chat_history = tk.Text(root, state=tk.DISABLED)

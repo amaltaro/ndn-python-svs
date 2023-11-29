@@ -6,24 +6,26 @@
 #    @Documentation: https://ndn-python-svs.readthedocs.io
 
 # Basic Libraries
-import subprocess
-import random
+import json
 import logging
+import random
+import subprocess
 import sys
+import socket
+import threading
 from argparse import ArgumentParser, SUPPRESS
 from typing import List, Callable, Optional
 # NDN Imports
-
 from ndn.encoding import Name
+
 # Custom Imports
 sys.path.insert(0, '.')
-from src.ndn.svs import SVSyncShared_Thread, SVSyncLogger, MissingData, AsyncWindow
-import socket
-import threading
+from src.ndn.svs import SVSyncShared_Thread, SVSyncBase_Thread, SVSyncLogger, MissingData, AsyncWindow
 
 
 HOST = "127.0.0.1"
 PORT = random.randint(50401, 50499)
+JSON_FILE = ""
 
 
 def parse_cmd_args() -> dict:
@@ -44,26 +46,34 @@ def parse_cmd_args() -> dict:
     args = {}
     args["group_prefix"] = argvars.group_prefix if argvars.group_prefix is not None else "/svs"
     args["node_id"] = argvars.node_name
+
+    # FIXME hack to get the sync messages into the display GUI
+    global JSON_FILE
+    JSON_FILE = args["node_id"] + ".json"
+
     return args
 
 
-def on_missing_data(prog_instance, missing_list: List[MissingData]) -> None:
+def on_missing_data(thread: SVSyncBase_Thread) -> Callable:
     taskwindow = AsyncWindow(10)
 
     async def wrapper(missing_list: List[MissingData]) -> None:
         async def missingfunc(nid: Name, seqno: int) -> None:
-            content_str: Optional[bytes] = await prog_instance.svs_thread.getSVSync().fetchData(nid, seqno, 2)
+            content_str: Optional[bytes] = await thread.getSVSync().fetchData(nid, seqno, 2)
             if content_str:
                 output_str: str = Name.to_str(nid) + ": " + content_str.decode()
-                # Send output_str to the GUI client using the Program instance
-                prog_instance.send_to_client(output_str)
+                sys.stdout.write("\033[K")
+                sys.stdout.flush()
+                print(output_str)
+                with open(JSON_FILE, "wt+") as jo:
+                    json.dump(output_str, jo)
 
         for i in missing_list:
             while i.lowSeqno <= i.highSeqno:
                 taskwindow.addTask(missingfunc, (Name.from_str(i.nid), i.lowSeqno))
                 i.lowSeqno = i.lowSeqno + 1
 
-    wrapper(missing_list)
+    return wrapper
 
 
 class Program:
@@ -71,33 +81,31 @@ class Program:
         self.args = args
         self.svs_thread: SVSyncShared_Thread = SVSyncShared_Thread(Name.from_str(self.args["group_prefix"]),
                                                                    Name.from_str(self.args["node_id"]),
-                                                                   lambda missing_list: on_missing_data(self,
-                                                                                                        missing_list),
+                                                                   on_missing_data,
                                                                    self.args["cache_data"])
         self.svs_thread.daemon = True
         self.svs_thread.start()
         self.svs_thread.wait()
         print(f'SVS chat client started | {self.args["group_prefix"]} - {self.args["node_id"]} |')
-        self.socket_thread = threading.Thread(target=self.start_socket_server, daemon=True)
-        self.socket_thread.start()
-        self.client_socket = None  # To keep track of the GUI client socket
 
-    # def run(self) -> None:
-    #     while 1:
-    #         try:
-    #             val:str = input("")
-    #             sys.stdout.write("\033[F"+"\033[K")
-    #             sys.stdout.flush()
-    #             if val.strip() != "":
-    #                 print("YOU: "+val)
-    #                 self.svs_thread.publishData(val.encode())
-    #         except KeyboardInterrupt:
-    #             sys.exit()
+    def run(self) -> None:
+        while 1:
+            try:
+                val: str = input("")
+                sys.stdout.write("\033[F" + "\033[K")
+                sys.stdout.flush()
+                if val.strip() != "":
+                    print("YOU: " + val)
+                    self.svs_thread.publishData(val.encode())
+                    self.send_to_client(val)
+            except KeyboardInterrupt:
+                sys.exit()
+
 
     def start_socket_server(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server.bind(('127.0.0.1', PORT))
+        server.bind((HOST, PORT))
         server.listen()
         print(f'server listening on: {HOST}:{PORT}')
         while True:
@@ -128,19 +136,17 @@ class Program:
 
 def main() -> int:
     args = parse_cmd_args()
-    args["node_id"] = Name.to_str(Name.from_str(args["node_id"]))
-    args["group_prefix"] = Name.to_str(Name.from_str(args["group_prefix"]))
     args["cache_data"] = True
-    SVSyncLogger.config(True, None, logging.DEBUG)
 
-    prog = Program(args)
     ###### Setup GUI
     print("Creating the GUI...")
-    p = subprocess.Popen(['python3', 'examples/chat_gui.py', str(PORT)])
-    try:
-        threading.Event().wait()
-    except KeyboardInterrupt:
-        sys.exit()
+    p = subprocess.Popen(['python3', 'examples/chat_gui.py', args["node_id"], str(PORT)])
+
+    SVSyncLogger.config(True, None, logging.DEBUG)
+    prog = Program(args)
+    ### setup socket to talk to the GUI
+    prog.start_socket_server()
+    prog.run()
 
     return 0
 
