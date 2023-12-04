@@ -1,10 +1,7 @@
-#    @Author: Justin C Presley
-#    @Author-Email: justincpresley@gmail.com
-#    @Project: NDN State Vector Sync Protocol
-#    @Source-Code: https://github.com/justincpresley/ndn-python-svs
-#    @Pip-Library: https://pypi.org/project/ndn-svs
-#    @Documentation: https://ndn-python-svs.readthedocs.io
-
+"""
+A substantial part of this implementation comes from:
+https://github.com/justincpresley/ndn-python-svs/blob/enhanced/examples/chat.py
+"""
 # Basic Libraries
 import json
 import logging
@@ -26,6 +23,8 @@ from src.ndn.svs import SVSyncShared_Thread, SVSyncBase_Thread, SVSyncLogger, Mi
 HOST = "127.0.0.1"
 PORT = random.randint(50401, 50499)
 JSON_FILE = ""
+HISTORY_FILE = "history.json"
+ENABLE_HISTORY = False
 
 
 def parse_cmd_args() -> dict:
@@ -61,13 +60,21 @@ def on_missing_data(thread: SVSyncBase_Thread) -> Callable:
         async def missingfunc(nid: Name, seqno: int) -> None:
             content_str: Optional[bytes] = await thread.getSVSync().fetchData(nid, seqno, 2)
             if content_str:
-                output_str: str = Name.to_str(nid) + ": " + content_str.decode()
+                nid = Name.to_str(nid)
+                output_str: str = nid + ": " + content_str.decode()
                 sys.stdout.write("\033[K")
                 sys.stdout.flush()
                 print(output_str)
                 with open(JSON_FILE, "wt+") as jo:
                     json.dump(output_str, jo)
-
+                # FIXME: node_1 will keep a history
+                if ENABLE_HISTORY:
+                    with open(HISTORY_FILE, "rt") as jo:
+                        data = json.load(jo)
+                        data.append({"node_id": nid, "data": content_str.decode()})
+                        print(data)
+                    with open(HISTORY_FILE, "wt") as jo:
+                        json.dump(data, jo)
         for i in missing_list:
             while i.lowSeqno <= i.highSeqno:
                 taskwindow.addTask(missingfunc, (Name.from_str(i.nid), i.lowSeqno))
@@ -95,7 +102,7 @@ class Program:
                 sys.stdout.write("\033[F" + "\033[K")
                 sys.stdout.flush()
                 if val.strip() != "":
-                    print("YOU: " + val)
+                    print("You: " + val)
                     self.svs_thread.publishData(val.encode())
                     self.send_to_client(val)
             except KeyboardInterrupt:
@@ -122,6 +129,13 @@ class Program:
                     if message.strip() != "":
                         print("YOU: " + message)
                         self.svs_thread.publishData(message.encode())
+                        # FIXME: node_1 will keep a history
+                        if ENABLE_HISTORY:
+                            with open(HISTORY_FILE, "rt") as jo:
+                                data = json.load(jo)
+                                data.append({"node_id": self.args["node_id"], "data": message})
+                            with open(HISTORY_FILE, "wt") as jo:
+                                json.dump(data, jo)
             except (ConnectionResetError, BrokenPipeError):
                 self.client_socket = None
                 break
@@ -137,6 +151,16 @@ class Program:
 def main() -> int:
     args = parse_cmd_args()
     args["cache_data"] = True
+
+    # Clear the json file
+    with open(JSON_FILE, 'wt') as jo:
+        json.dump("", jo)
+    # FIXME: node_1 will keep a history
+    if args["node_id"] == "node_1":
+        global ENABLE_HISTORY
+        ENABLE_HISTORY = True
+        with open(HISTORY_FILE, "wt") as jo:
+            json.dump([], jo)
 
     ###### Setup GUI
     print("Creating the GUI...")
