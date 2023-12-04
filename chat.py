@@ -10,6 +10,7 @@ import subprocess
 import sys
 import socket
 import threading
+import time
 from argparse import ArgumentParser, SUPPRESS
 from typing import List, Callable, Optional
 # NDN Imports
@@ -64,15 +65,16 @@ def on_missing_data(thread: SVSyncBase_Thread) -> Callable:
                 output_str: str = nid + ": " + content_str.decode()
                 sys.stdout.write("\033[K")
                 sys.stdout.flush()
-                print(output_str)
+                print(f"Missing function: {output_str}")
                 with open(JSON_FILE, "wt+") as jo:
                     json.dump(output_str, jo)
+                time.sleep(0.1)
                 # FIXME: node_1 will keep a history
                 if ENABLE_HISTORY:
                     with open(HISTORY_FILE, "rt") as jo:
                         data = json.load(jo)
                         data.append({"node_id": nid, "data": content_str.decode()})
-                        print(data)
+                        print(f"Dumping into history: {data}")
                     with open(HISTORY_FILE, "wt") as jo:
                         json.dump(data, jo)
         for i in missing_list:
