@@ -26,13 +26,11 @@ def listen_for_messages():
         time.sleep(0.05)
 
 
-def send_message():
-    message = message_entry.get()
+def send_message(message):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
         client_socket.connect((HOST, PORT))
         client_socket.sendall(message.encode('utf-8'))
     display_message(f"You: {message}")
-    message_entry.delete(0, tk.END)
 
 
 def display_message(message):
@@ -40,6 +38,22 @@ def display_message(message):
     chat_history.insert(tk.END, message + "\n")
     chat_history.config(state=tk.DISABLED)
     chat_history.yview(tk.END)
+
+def simulate_messages():
+    input_fname = "dataset.json"
+    while True:
+        with open(input_fname, "rt") as jo:
+            data = json.load(jo)
+        if not data:
+            break  # file has been consumed
+        # is the next message for me?
+        item = data.pop(0)
+        if item['node_id'] == NODE_NAME:
+            send_message(item['data'])
+            # write an up-to-date content to the dataset file
+            with open(input_fname, "wt") as jo:
+                json.dump(data, jo)
+        time.sleep(0.06)
 
 # Creating the main window
 root = tk.Tk()
@@ -68,4 +82,5 @@ send_button.pack(padx=10, pady=10)
 # Start listening for messages
 threading.Thread(target=listen_for_messages, daemon=True).start()
 
+root.after(0, simulate_messages)
 root.mainloop()
