@@ -25,8 +25,7 @@ HOST = "127.0.0.1"
 PORT = random.randint(50401, 50499)
 JSON_FILE = ""
 NODE_NAME = ""
-HISTORY_FILE = "history.json"
-ENABLE_HISTORY = False
+HISTORY_FILE = ""
 
 
 def parse_cmd_args() -> dict:
@@ -49,10 +48,10 @@ def parse_cmd_args() -> dict:
     args["node_id"] = argvars.node_name
 
     # FIXME hack to get the sync messages into the display GUI
-    global JSON_FILE
+    global JSON_FILE, HISTORY_FILE, NODE_NAME
     JSON_FILE = args["node_id"] + ".json"
-    global NODE_NAME
     NODE_NAME = args["node_id"]
+    HISTORY_FILE = f"history_{NODE_NAME}.json"
 
     return args
 
@@ -74,14 +73,12 @@ def on_missing_data(thread: SVSyncBase_Thread) -> Callable:
                 with open(JSON_FILE, "wt+") as jo:
                     json.dump(output_str, jo)
                 time.sleep(0.05)
-                # FIXME: node_1 will keep a history
-                if ENABLE_HISTORY:
-                    with open(HISTORY_FILE, "rt") as jo:
-                        data = json.load(jo)
-                        data.append({"node_id": nid, "data": content_str.decode()})
-                        print(f"Dumping into history: {data}")
-                    with open(HISTORY_FILE, "wt") as jo:
-                        json.dump(data, jo)
+                with open(HISTORY_FILE, "rt") as jo:
+                    data = json.load(jo)
+                    data.append({"node_id": nid, "data": content_str.decode()})
+                    # print(f"Dumping into history: {data}")
+                with open(HISTORY_FILE, "wt") as jo:
+                    json.dump(data, jo)
         for i in missing_list:
             while i.lowSeqno <= i.highSeqno:
                 taskwindow.addTask(missingfunc, (Name.from_str(i.nid), i.lowSeqno))
@@ -136,13 +133,11 @@ class Program:
                     if message.strip() != "":
                         print(f"YOU ({self.args['node_id']}): {message}")
                         self.svs_thread.publishData(message.encode())
-                        # FIXME: node_1 will keep a history
-                        if ENABLE_HISTORY:
-                            with open(HISTORY_FILE, "rt") as jo:
-                                data = json.load(jo)
-                                data.append({"node_id": self.args["node_id"], "data": message})
-                            with open(HISTORY_FILE, "wt") as jo:
-                                json.dump(data, jo)
+                        with open(HISTORY_FILE, "rt") as jo:
+                            data = json.load(jo)
+                            data.append({"node_id": self.args["node_id"], "data": message})
+                        with open(HISTORY_FILE, "wt") as jo:
+                            json.dump(data, jo)
             except (ConnectionResetError, BrokenPipeError):
                 self.client_socket = None
                 break
@@ -162,12 +157,8 @@ def main() -> int:
     # Clear the json file
     with open(JSON_FILE, 'wt') as jo:
         json.dump("", jo)
-    # FIXME: node_1 will keep a history
-    if args["node_id"] == "node_1":
-        global ENABLE_HISTORY
-        ENABLE_HISTORY = True
-        with open(HISTORY_FILE, "wt") as jo:
-            json.dump([], jo)
+    with open(HISTORY_FILE, "wt") as jo:
+        json.dump([], jo)
 
     ###### Setup GUI
     print("Creating the GUI...")
