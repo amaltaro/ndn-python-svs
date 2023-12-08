@@ -40,6 +40,7 @@ def display_message(message):
     chat_history.yview(tk.END)
 
 def simulate_messages():
+    print(f"{time.time()} called simulate_messages")
     input_fname = "dataset.json"
     while True:
         with open(input_fname, "rt") as jo:
@@ -53,7 +54,7 @@ def simulate_messages():
             # write an up-to-date content to the dataset file
             with open(input_fname, "wt") as jo:
                 json.dump(data, jo)
-        time.sleep(0.06)
+        time.sleep(0.1)
 
 # Creating the main window
 root = tk.Tk()
@@ -82,5 +83,6 @@ send_button.pack(padx=10, pady=10)
 # Start listening for messages
 threading.Thread(target=listen_for_messages, daemon=True).start()
 
-root.after(0, simulate_messages)
+print(f"{time.time()} going to call simulate_messages")
+root.after(3 * 1000, simulate_messages)
 root.mainloop()

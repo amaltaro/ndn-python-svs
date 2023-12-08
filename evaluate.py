@@ -37,24 +37,30 @@ def compare_messages(num_nodes):
     history_file = 'history.json'
     # Load the group history from history.json
     with open(history_file, 'r') as f:
-        history_messages = set(json.load(f))
+        history_messages = json.load(f)
+    print(f"history_messages type {type(history_messages)} and content: {history_messages}")
+    history_messages = history_messages
 
     for i in range(1, num_nodes + 1):
         node_name = f'node_{i}'
         with open(f'{node_name}.json', 'r') as f:
-            node_messages = set(json.load(f))
+            node_messages = json.load(f)
+        print(f"node_messages type {type(node_messages)} and content: {node_messages}")
 
-            missing_in_node = history_messages - node_messages
-            extra_in_node = node_messages - history_messages
+        hist_nodes = set([item['data'] for item in history_messages if item['node_id'] == node_name])
+        msgs_nodes = set([item for item in node_messages.split(": ") if not item.startswith("node")])
 
-            if missing_in_node or extra_in_node:
-                print(f'Differences for {node_name}:')
-                if missing_in_node:
-                    print(f' - Missing in node: {missing_in_node}')
-                if extra_in_node:
-                    print(f' - Extra in node: {extra_in_node}')
-            else:
-                print(f'No differences for {node_name}')
+        missing_in_node = hist_nodes - msgs_nodes
+        extra_in_node = msgs_nodes - hist_nodes
+
+        if missing_in_node or extra_in_node:
+            print(f'Differences for {node_name}:')
+            if missing_in_node:
+                print(f' - Missing in node: {missing_in_node}')
+            if extra_in_node:
+                print(f' - Extra in node: {extra_in_node}')
+        else:
+            print(f'No differences for {node_name}')
 
 
 def main():

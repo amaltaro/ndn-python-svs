@@ -24,6 +24,7 @@ from src.ndn.svs import SVSyncShared_Thread, SVSyncBase_Thread, SVSyncLogger, Mi
 HOST = "127.0.0.1"
 PORT = random.randint(50401, 50499)
 JSON_FILE = ""
+NODE_NAME = ""
 HISTORY_FILE = "history.json"
 ENABLE_HISTORY = False
 
@@ -50,6 +51,8 @@ def parse_cmd_args() -> dict:
     # FIXME hack to get the sync messages into the display GUI
     global JSON_FILE
     JSON_FILE = args["node_id"] + ".json"
+    global NODE_NAME
+    NODE_NAME = args["node_id"]
 
     return args
 
@@ -62,13 +65,15 @@ def on_missing_data(thread: SVSyncBase_Thread) -> Callable:
             content_str: Optional[bytes] = await thread.getSVSync().fetchData(nid, seqno, 2)
             if content_str:
                 nid = Name.to_str(nid)
+                # TODO avoid backslack in the beginning of the node name.
+                nid = nid[1:] if nid.startswith("/") else nid
                 output_str: str = nid + ": " + content_str.decode()
                 sys.stdout.write("\033[K")
                 sys.stdout.flush()
-                print(f"Missing function: {output_str}")
+                print(f"Node {NODE_NAME} is missing data: {output_str}")
                 with open(JSON_FILE, "wt+") as jo:
                     json.dump(output_str, jo)
-                time.sleep(0.1)
+                time.sleep(0.05)
                 # FIXME: node_1 will keep a history
                 if ENABLE_HISTORY:
                     with open(HISTORY_FILE, "rt") as jo:
@@ -99,7 +104,8 @@ class Program:
 
     def run(self) -> None:
         while 1:
-            try:
+            time.sleep(0.05)
+            """try:
                 val: str = input("")
                 sys.stdout.write("\033[F" + "\033[K")
                 sys.stdout.flush()
@@ -108,8 +114,7 @@ class Program:
                     self.svs_thread.publishData(val.encode())
                     self.send_to_client(val)
             except KeyboardInterrupt:
-                sys.exit()
-
+                sys.exit()"""
 
     def start_socket_server(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -129,7 +134,7 @@ class Program:
                 message = client_socket.recv(1024).decode('utf-8')
                 if message:
                     if message.strip() != "":
-                        print("YOU: " + message)
+                        print(f"YOU ({self.args['node_id']}): {message}")
                         self.svs_thread.publishData(message.encode())
                         # FIXME: node_1 will keep a history
                         if ENABLE_HISTORY:
